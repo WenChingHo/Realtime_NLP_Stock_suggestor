@@ -16,27 +16,28 @@ This final project was made with the goal to creating a platform that crawls and
 4. Django + channels (Redis) + WebSockets to create a real-time chatbox that combines multiple comment threads throughout the internet, allowing users to see what other people on different platforms are talking about!<br>
 5. Shioaji API to get streaming stock data
  <br><br>
-<img src="https://github.com/WenChingHo/Realtime_NLP_Stock_suggestor/blob/main/server%20bp.png" width="800"> | <img 
+<img src="https://github.com/WenChingHo/Realtime_NLP_Stock_suggestor/blob/main/server%20bp.png" width="800">
 
 
 ## Technologies:
 #### Web application:
 - Django
 - Redis (on Docker)
-- reconnecting-websocket
+- [Reconnecting-websocket](https://github.com/joewalnes/reconnecting-websocket)
+- [Lightweight-charts](https://github.com/tradingview/lightweight-charts)
 - HTML/CSS/Javascript/JQuery/Bootstrap
                                                                                                                     
 #### Model training:                                                                                        
 - Python 3.8
 - Tensorflow 2.5.0
 - Scikit-learn
-- Shiaoji
+- [Shioaji](https://sinotrade.github.io/)
 
 #### Crawlers:    
 - ABC.meta
 - Asyncio
 - Aiohttp
-- Pyppeteer
+- [Pyppeteer](https://github.com/pyppeteer/pyppeteer)
 - Scrapy
 - Bs4
 - Regex                                                                                                         
