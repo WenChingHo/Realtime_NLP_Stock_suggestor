@@ -1,9 +1,12 @@
 # Real-time Stock Suggestor 
 
 ## Table of contents
+* [Demo Video](#demo-video)
 * [Intro / General info](#general-info)
 * [Technologies](#technologies)
 
+## Demo Video:
+url: https://youtu.be/L4N0NOmBMi0
 
 ## General info: 
 #### Statement of Purpose:</b><br>
