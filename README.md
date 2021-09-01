@@ -1,3 +1,7 @@
+
+
+Uploading 8mb.video-J6U-QjwKFRei.mp4…
+
 # Real-time Stock Suggestor 
 
 ## Table of contents
@@ -25,6 +29,7 @@ This final project was made with the goal to creating a platform that crawls and
 ## Technologies:
 #### Web application:
 - Django
+- PostgreSQL
 - Redis (on Docker)
 - [Reconnecting-websocket](https://github.com/joewalnes/reconnecting-websocket)
 - [Lightweight-charts](https://github.com/tradingview/lightweight-charts)
