@@ -1,6 +1,6 @@
 
 
-Uploading 8mb.video-J6U-QjwKFRei.mp4…
+
 
 # Real-time Stock Suggestor 
 
@@ -10,7 +10,10 @@ Uploading 8mb.video-J6U-QjwKFRei.mp4…
 * [Technologies](#technologies)
 
 ## Demo Video:
-url: https://youtu.be/L4N0NOmBMi0
+
+https://user-images.githubusercontent.com/85402171/131708231-4934bd25-0c17-41f2-baa8-d850125d6552.mp4
+
+Youtube url: https://youtu.be/L4N0NOmBMi0
 
 ## General info: 
 #### Statement of Purpose:</b><br>
