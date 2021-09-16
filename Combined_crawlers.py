@@ -10,10 +10,10 @@ import asyncio
 async def main():
     # Create crawler coroutine 
     crawlers = [
-        closing_price_crawler("db.sqlite3").start(),
-        udn_crawler("News.db").start(), 
-        cmoney_crawler("Comment.db").start(),
-        pchome_crawler("News.db").start()
+        closing_price_crawler().start(),
+        udn_crawler().start(), 
+        cmoney_crawler_rt().start(),
+        pchome_crawler_rt(1,0).start()
     ]
     # Wrap coroutine into tasks to be passed into asyncio.wait()
     tasks = [asyncio.create_task(crawler) for crawler in crawlers]
