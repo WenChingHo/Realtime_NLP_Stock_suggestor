@@ -10,51 +10,58 @@ import asyncio
 import aiohttp
 import json
 from my_websocket import RT_updater
-from sqlalchemy import create_engine
 
-class pchome_crawler(Crawler):
-    def __init__(self):
+class pchome_crawler_rt(Crawler):
+    def __init__(self, min:0, sec:30):
         self.connect_to_db()
-        
-    def connect_to_db(self):
+        self.min = min
+        self.sec = sec
+    def connect_to_db(self) -> None:
         super().connect_to_db()
    
     async def find_links(self, ticker:str)->None:
         async with aiohttp.ClientSession() as s:
             async with s.post(f'https://pchome.megatime.com.tw/stock/sto5/sid{ticker}.html', headers = self.HEADER, data = {'is_check':'1'}) as res:
-                # find title and url
                 html_text = await res.text()
-                url_pattern = f'\/news\/cat1\/({(datetime.today()).year}.*)\"  class=\"news18\">(.*?)<span class=\"ic[\s\S]*?>\((.*?)\)<\/span>'
+                print(ticker)
+                url_pattern = f'/news/cat1/({datetime.now().strftime("%Y%m%d")}.*)\"  class=\"news18\">(.*?)<[\s\S]*?icDate\">\((.*?)\)'
                 url_titles = re.findall(url_pattern, html_text)
+
                 if url_titles:
-                    print("_"*50+'\n', f"<{__name__}> {ticker}: \n", url_titles)
                     return await self.crawl_data_to_db(ticker, url_titles, s)
                 return (ticker, 0)
 
-    def stream_data(self, ticker, publisher, date, time, title, url ):
-        payload = {'title': title,
+    def stream_data(self, ticker, data):
+        payload = {'title': data[1], #爬到的留言
             'category': "news",
-            "publisher": publisher,  #news publisher
-            "date": date,
-            "time":time,  #YYYY-MM-DD HH:MM:SS
-            "url":url
+            "publisher": data[0],  #爬蟲的名字
+            "time":data[2],  #爬到的時間
+            "url":data[3]
             } 
         messenger = RT_updater(ticker, json.dumps(payload))
         messenger.run()
         messenger.close()
 
-    async def crawl_data_to_db(self, ticker, url_title:list, session:object):
-        df= pd.DataFrame(columns= ["date","time","publisher", "ticker","url","title","content","label"])
-
+    async def crawl_data_to_db(self, ticker:str, url_title:list, session:object)->None:
+        df= pd.DataFrame(columns= ["date","time","publisher", "ticker","url","title","content"])
+        print(url_title)
         new_comment_count = 0
-        url_title.reverse()
-        timeframe = (datetime.now()-timedelta(days=1)).replace(hour=14)
+        #restict search zone to time since last crawled + 1 minute buffer time
+        time_since_last_crawled = datetime.now()-timedelta(minutes= self.min)
+        #Reverse the list so the most recent data is shown at the top
+        url_title.reverse() 
+
         for url, title, date in url_title:
             news_publish_time = datetime.strptime(date[:11],'%m-%d %H:%M').replace(year=datetime.today().year)
+            # 避免重複存取新聞
             print(news_publish_time)
-            if news_publish_time < timeframe: continue
-            html_text = ""
+            if news_publish_time < time_since_last_crawled : 
+                print(news_publish_time)
+                continue
+
             print("_"*50 + f"Pchome {ticker}:" + "_"*50 + "\nurl: " + url + '\nTitle: ' + title)
+
+            # handle post request informality on their website
             try:
                 async with session.post(
                     f'https://pchome.megatime.com.tw/news/cat1/{url}',
@@ -70,61 +77,51 @@ class pchome_crawler(Crawler):
                     headers = self.HEADER
                     ) as res:
                     html_text = await res.text()
+            finally:
+                accurate_title_time = re.findall(f"\">({title[:-4]}.*?)<\/a>[\s\S]*?\((.*?)\)", html_text)
+                print(accurate_title_time)
+                print(type(accurate_title_time))
+                strict_article_time = datetime.strptime(accurate_title_time[0][1], '%Y-%m-%d %H:%M:%S')
 
-            accurate_title_time = re.findall(f"\">({title[:-4]}.*?)<\/a>[\s\S]*?\((.*?)\)", html_text)
-            article_datetime = datetime.strptime(accurate_title_time[0][1], '%Y-%m-%d %H:%M:%S')
-            article_time = accurate_title_time[0][1]
-            article_title = accurate_title_time[0][0]
-            if article_datetime< timeframe: continue
-            regex = f"即時新聞內文 開始[\s\S]*?({title[:-4]}[\s\S]*?)<\/div>|newsarticle start([\s\S]*)?<\/article>"
-            content = max(re.findall(regex, html_text), key = len) #returns a list of tuples
+                print(strict_article_time, time_since_last_crawled)
+                if strict_article_time < time_since_last_crawled: continue
 
-            if len(content)>1:
-                trimmed_content = max([re.sub("[^，。\u4e00-\u9fa51-9]","",i) for i in content],key=len)  
-            else:
-                trimmed_content = re.sub("[^，。\u4e00-\u9fa51-9]","", max(content, key=len))
+                regex = f"即時新聞內文 開始[\s\S]*?({title[:-4]}[\s\S]*?)<\/div>|newsarticle start([\s\S]*)?<\/article>"
+                content = max(re.findall(regex, html_text), key = len) #returns a list of tuple
+                # 找到最長的 = 新聞內容
+                if len(content)>1:
+                    trimmed_content = max([re.sub("[^，。\u4e00-\u9fa51-9]","",i) for i in content],key=len)  
+                else:
+                    trimmed_content = re.sub("[^，。\u4e00-\u9fa51-9]","", max(content, key=len))
+                new_comment_count +=1
+                # 要加到df上的資料
+                data = date.split()
 
-            new_comment_count +=1
-            # data to add to df
-            article_publisher = date.split()[2]
-            payload = [
-                article_time[:10],
-                article_time[11:], 
-                article_publisher,
-                ticker, 
-                f'https://pchome.megatime.com.tw/news/cat1/{url}', 
-                article_title, 
-                trimmed_content if len(trimmed_content)<1000 else trimmed_content[:1000], 
-                "T"
-            ]
-            #df columns: (ticker, publisher, date, time, title, url ):
-            self.stream_data(
-                ticker, 
-                article_publisher, 
-                article_time[:10],
-                article_time[11:],
-                article_title,
-                f'https://pchome.megatime.com.tw/news/cat1/{url}'
-            )
-            df.loc[len(df)] = payload
-        if len(df):
-            try:
-                df.to_sql("stockSuggestor_news", self.engine, if_exists='append', index=False, chunksize=10000) 
-            except Exception as err:
-                print(err)  
-            return (ticker, new_comment_count)
+                df= pd.DataFrame(columns= ["date","time","publisher", "ticker","url","title","content","label"])
+                payload = [accurate_title_time[0][1][:10], accurate_title_time[0][11:], data[2], ticker, f'https://pchome.megatime.com.tw/news/cat1/{url}' , accurate_title_time[0][0], trimmed_content]
+                self.stream_data(ticker, [data[2],title,data[1],f'https://pchome.megatime.com.tw/news/cat1/{url}'])
+                print(payload)
+                df.loc[len(df)] = payload
+        if not df.empty:
+            df.to_sql("stockSuggestor_news", self.engine, if_exists='append', index=False, chunksize=10000)  
+            pass
+        return (ticker, new_comment_count)
 
     async def start(self):
+        if self.min: self.time_between_search = self.min*60 +self.sec
         with open("top_150_ticker.pkl", "rb") as f:
             ticker_dict = pickle.load(f)
             tasks = []
             while True:
-                for ticker in ticker_dict.values():#ticker_dict.values():
-                    tasks.append(asyncio.create_task(self.find_links(ticker)))
+                for ticker in ticker_dict.values():
+                    try:
+                        tasks.append(asyncio.create_task(self.find_links(ticker)))
+                    except Exception as err:
+                        print(err)
                 await asyncio.wait(tasks) 
-                await asyncio.sleep(500)
-
+                #print(last_title)       
+                await asyncio.sleep(self.time_between_search)
                 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(pchome_crawler().start())
+    loop.run_until_complete(pchome_crawler_rt(min =1, sec = 0).start())
