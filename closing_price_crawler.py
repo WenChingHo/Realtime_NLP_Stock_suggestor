@@ -6,16 +6,22 @@ from datetime import datetime, timedelta
 from ABC_Crawler import Crawler
 import asyncio
 import aiohttp
-
+import psycopg2
+import re
 
 class closing_price_crawler(Crawler):
-    def __init__(self, database):
-        self.connect_to_db(database)
+    def __init__(self):
+        self.connect_to_db()
         self.data = 0
 
-    def connect_to_db(self, database) -> None:
-        super().connect_to_db(database)
-
+    def connect_to_db(self) -> None:
+        self.connect = psycopg2.connect("""
+            dbname= stocksuggestordb
+            host= localhost
+            user=eddie
+            port=5432
+            """)
+        self.cursor = self.connect.cursor()
     def get_last_data_date(self):
         week_of_day = datetime.today().weekday()
         days_to_subtract = 0
@@ -38,7 +44,7 @@ class closing_price_crawler(Crawler):
             tickers = pickle.load(f)
             for ticker in tickers.values():
                 # get data from sql
-                self.cursor.execute(f"SELECT price FROM stockSuggestor_stock WHERE ticker =?", [ticker])
+                self.cursor.execute(f'SELECT price FROM "stockSuggestor_stock" WHERE ticker = CAST({str(ticker)} as char(10))' )
                 rows = self.cursor.fetchall()
                 price_time_ls = json.loads(rows[0][0])
                 if price_time_ls[-1]["time"] == time:
@@ -48,14 +54,17 @@ class closing_price_crawler(Crawler):
                 price_time_ls.pop(0)
                 # add new entry and update
                 price_time_ls.append({'time': time, 'value': float(self.data[ticker])}) 
-                self.cursor.execute("UPDATE stockSuggestor_stock SET price = ? WHERE ticker = ?",[json.dumps(price_time_ls),str(ticker)])
+                self.cursor.execute('UPDATE "stockSuggestor_stock" SET price = %s WHERE ticker = %s', [json.dumps(price_time_ls),str(ticker)])
+                
             self.connect.commit()
-    
+            self.connect.close()
+            self.cursor.close()
     async def start(self):
         await self.parse_data()
         await self.crawl_data_to_db()
+        
     async def stream_data(self, ticker, data):
         pass
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(closing_price_crawler("db.sqlite3").start())
+    loop.run_until_complete(closing_price_crawler().start())
